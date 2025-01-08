@@ -1,65 +1,65 @@
-name: 'cPanel Git Deployment'
-description: 'Reusable workflow to push code to a cPanel-hosted site using Git.'
+name: cPanel Git Deployment
+description: "Reusable workflow to push code to a cPanel-hosted site using Git."
 
 on:
   workflow_call:
     inputs:
       branch:
         type: string
-        description: 'The Git branch to deploy and push to the remote repository.'
+        description: "The Git branch to deploy and push to the remote repository."
         required: true
       push-options:
         type: string
-        description: 'Additional options for the `git push` command (e.g. `--force`).'
+        description: "Additional options for the `git push` command (e.g. `--force`)."
         required: false
-        default: '--force'
+        default: "--force"
     secrets:
       debug:
-        description: 'Set to `true` to enable debug logging.'
+        description: "Set to `true` to enable debug logging."
         required: false
       remote-url:
-        description: 'The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`).'
+        description: "The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
         required: true
       ssh-private-key:
-        description: 'The SSH private key used to authenticate with the remote repository.'
+        description: "The SSH private key used to authenticate with the remote repository."
         required: true
 
     outputs:
       deploy-id:
-        description: 'The deployment ID generated during the process.'
-        value: ${{ jobs.cpanel-git-deployment.outputs.deploy-id }}
+        description: "The deploy ID generated during the process."
+        value: ${{ jobs.deploy-to-cpanel-host.outputs.deploy-id }}
 
 jobs:
-  cpanel-git-deployment:
+  deploy-to-cpanel-host:
+    name: Deploy to cPanel host
     runs-on: ubuntu-latest
-    name: 'Deploy to cPanel Host'
 
     outputs:
       deploy-id: ${{ steps.get-deploy-id.outputs.deploy-id }}
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        ref: ${{ inputs.branch }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch }}
 
-    - name: 'Git Push Over SSH'
-      id: git-push
-      uses: drkibitz/github/actions/git-push-over-ssh@main
-      with:
-        debug: ${{ secrets.debug }}
-        push-options: ${{ inputs.push-options }}
-        remote-url: ${{ secrets.remote-url }}
-        ssh-private-key: ${{ secrets.ssh-private-key }}
+      - name: Git push over SSH
+        id: git-push
+        uses: drkibitz/github/actions/git-push-over-ssh@main
+        with:
+          debug: ${{ secrets.debug }}
+          push-options: ${{ inputs.push-options }}
+          remote-url: ${{ secrets.remote-url }}
+          ssh-private-key: ${{ secrets.ssh-private-key }}
 
-    - name: 'Extract Deployment ID'
-      id: get-deploy-id
-      run: |
-        deploy_id=$(grep -Eo "deploy_id: [0-9]+" "${{ steps.git-push.outputs.push-log }}" | cut -d ' ' -f2)
-        if [ -z "${deploy_id}" ]; then
-          echo "::error::FAIL: No deploy_id found in Git push log!"
-          exit 1
-        fi
-        echo -e "::notice::SUCCESS! Deploy ID: $deploy_id"
-        echo "deploy-id=$deploy_id" >> "$GITHUB_OUTPUT"
+      - name: Get deploy ID
+        id: get-deploy-id
+        run: |
+          deploy_id=$(grep -Eo "deploy_id: [0-9]+" "${{ steps.git-push.outputs.push-log }}" | cut -d ' ' -f2)
+          if [ -z "${deploy_id}" ]; then
+            echo "::error::FAIL: No deploy_id found in Git push log!"
+            exit 1
+          fi
+          echo -e "::notice::SUCCESS! Deploy ID: $deploy_id"
+          echo "deploy-id=$deploy_id" >> "$GITHUB_OUTPUT"
