@@ -1,5 +1,5 @@
-name: Setup SSH
-description: "A composite action to setup and configure SSH for connecting to a remote host."
+name: Setup SSH agent
+description: "A composite action to setup and configure the SSH agent for connecting to a remote host."
 author: Dr. Kibitz (@drkibitz)
 
 inputs:
@@ -20,7 +20,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup SSH
+    - name: Setup SSH agent
       run: |
         mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
         eval $(ssh-agent -s)

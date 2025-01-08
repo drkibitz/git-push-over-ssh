@@ -37,8 +37,8 @@ runs:
         debug: ${{ inputs.debug }}
         url: ${{ inputs.remote-url }}
 
-    - name: Setup SSH
-      uses: drkibitz/github/actions/setup-ssh@main
+    - name: Setup SSH agent
+      uses: drkibitz/github/actions/setup-ssh-agent@main
       with:
         port: ${{ steps.parse-url.outputs.port }}
         username: ${{ steps.parse-url.outputs.username }}
@@ -54,6 +54,6 @@ runs:
         remote-ref: ${{ inputs.remote-ref }}
         remote-url: ${{ inputs.remote-url }}
 
-    - name: Teardown SSH
-      uses: drkibitz/github/actions/teardown-ssh@main
+    - name: Teardown SSH agent
+      uses: drkibitz/github/actions/teardown-ssh-agent@main
       if: always()

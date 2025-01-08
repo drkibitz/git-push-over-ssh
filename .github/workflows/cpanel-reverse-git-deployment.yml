@@ -24,7 +24,7 @@ on:
 
 jobs:
   pull-cpanel-host-deployment:
-    name: Synchronize runtime changes
+    name: Pull cPanel host deployment
     runs-on: ubuntu-latest
 
     steps:
@@ -40,8 +40,8 @@ jobs:
         with:
           url: ${{ secrets.remote-url }}
 
-      - name: Setup SSH
-        uses: drkibitz/github/actions/setup-ssh@main
+      - name: Setup SSH agent
+        uses: drkibitz/github/actions/setup-ssh-agent@main
         with:
           port: ${{ steps.parse-url.outputs.port }}
           username: ${{ steps.parse-url.outputs.username }}
@@ -61,6 +61,6 @@ jobs:
           git push origin ${{ inputs.branch }}
         shell: bash
 
-      - name: Teardown SSH
-        uses: drkibitz/github/actions/teardown-ssh@main
+      - name: Teardown SSH agent
+        uses: drkibitz/github/actions/teardown-ssh-agent@main
         if: always()
