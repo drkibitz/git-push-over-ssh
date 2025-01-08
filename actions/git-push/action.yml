@@ -1,0 +1,45 @@
+name: Git push
+description: "A composite action to push changes to a remote Git repository."
+author: Dr. Kibitz (@drkibitz)
+
+inputs:
+  debug:
+    description: "Set to `true` to enable debug logging (default: `false`)."
+    required: false
+    default: "false"
+  push-options:
+    description: "Additional options for the `git push` command (e.g., `--force` or `--tags`). Leave empty for default behavior."
+    required: false
+    default: ""
+  remote-ref:
+    description: "The branch, tag, or commit SHA to push to the remote repository (default: `HEAD`)."
+    required: false
+    default: "HEAD"
+  remote-url:
+    description: "The URL of the remote repository (e.g., `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
+    required: true
+
+outputs:
+  push-log:
+    description: "The path to the log file containing the output of the `git push` command."
+    value: ${{ steps.git-push.outputs.push-log }}
+
+runs:
+  using: composite
+  steps:
+    - name: Git push
+      id: git-push
+      run: |
+        push_log="$(mktemp "$RUNNER_TEMP/git-push.XXXXXX.log")"
+        set +e
+        git push ${{ inputs.remote-url }} ${{ inputs.remote-ref }} ${{ inputs.push-options }} >> "$push_log" 2>&1
+        git_push_exit_code=$?
+        set -e
+        [[ "${{ inputs.debug }}" == "true" ]] && echo "::notice::Debug enabled, push output:" && cat "$push_log"
+        if (( git_push_exit_code > 0 )); then
+          echo "::error::Git push failed! Set input 'debug' to 'true' to view push output."
+          exit 1
+        fi
+        echo "::notice::Git push succeeded!"
+        echo "push-log=$push_log" >> "$GITHUB_OUTPUT"
+      shell: bash

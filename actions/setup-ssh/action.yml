@@ -1,0 +1,31 @@
+name: Setup SSH
+description: "A composite action to setup and configure SSH for connecting to a remote host."
+author: Dr. Kibitz (@drkibitz)
+
+inputs:
+  port:
+    description: "The port to connect to the SSH server (default: 22)."
+    required: false
+    default: "22"
+  username:
+    description: "The username for SSH authentication."
+    required: true
+  hostname:
+    description: "The hostname or IP address of the SSH server."
+    required: true
+  ssh-private-key:
+    description: "The SSH private key used to authenticate with the SSH server."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
+        eval $(ssh-agent -s)
+        ssh-keyscan -p ${{ inputs.port }} ${{ inputs.hostname }} >> ~/.ssh/known_hosts 2>/dev/null
+        echo "${{ inputs.ssh-private-key }}" | ssh-add -
+        ssh -T -p ${{ inputs.port }} -o BatchMode=yes ${{ inputs.username }}@${{ inputs.hostname }}
+        echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+      shell: bash

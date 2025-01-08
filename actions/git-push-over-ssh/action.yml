@@ -4,23 +4,19 @@ author: Dr. Kibitz (@drkibitz)
 
 inputs:
   debug:
-    description: "Set to `true` to enable debug logging."
+    description: "Set to `true` to enable debug logging (default: `false`)."
     required: false
     default: "false"
   push-options:
-    description: "Additional options for the `git push` command (e.g. `--force`)."
+    description: "Additional options for the `git push` command (e.g., `--force` or `--tags`). Leave empty for default behavior."
     required: false
     default: ""
-  remote-name:
-    description: "The name of the remote repository (e.g. `origin`, `upstream`)."
-    required: false
-    default: "upstream"
   remote-ref:
-    description: "The branch, tag, or commit SHA to push to the remote repository (default: `HEAD`)."
+    description: "The branch, tag, or commit SHA to push to the remote repository. Default: `HEAD`."
     required: false
     default: "HEAD"
   remote-url:
-    description: "The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
+    description: "The Git+SSH URL of the remote repository (e.g., `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
     required: true
   ssh-private-key:
     description: "The SSH private key used to authenticate with the remote repository."
@@ -34,55 +30,30 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Parse remote Git SSH URL
+    - name: Parse Git+SSH URL
       id: parse-url
       uses: drkibitz/github/actions/parse-git-ssh-url@main
       with:
         debug: ${{ inputs.debug }}
         url: ${{ inputs.remote-url }}
 
-    - name: Configure SSH
-      id: ssh
-      run: |
-        mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
-        eval $(ssh-agent -s)
-        ssh-keyscan -p ${{ steps.parse-url.outputs.port }} ${{ steps.parse-url.outputs.hostname }} >> ~/.ssh/known_hosts 2>/dev/null
-        echo "${{ inputs.ssh-private-key }}" | ssh-add -
-        ssh -T -p ${{ steps.parse-url.outputs.port }} -o BatchMode=yes ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }}
-        echo "ssh-auth-sock=$SSH_AUTH_SOCK" >> "$GITHUB_OUTPUT"
-      shell: bash
+    - name: Setup SSH
+      uses: drkibitz/github/actions/setup-ssh@main
+      with:
+        port: ${{ steps.parse-url.outputs.port }}
+        username: ${{ steps.parse-url.outputs.username }}
+        hostname: ${{ steps.parse-url.outputs.hostname }}
+        ssh-private-key: ${{ inputs.ssh-private-key }}
 
-    - name: Configure Git remote
-      run: |
-        git remote add ${{ inputs.remote-name }} ${{ inputs.remote-url }}
-        echo "::notice::Git remote '${{ inputs.remote-name }}' URL: $(git config --get remote.${{ inputs.remote-name }}.url)"
-      shell: bash
-
-    - name: Execute Git push
+    - name: Git push
       id: git-push
-      env:
-        SSH_AUTH_SOCK: ${{ steps.ssh.outputs.ssh-auth-sock }}
-      run: |
-        set +e
-        push_log=$(mktemp "$RUNNER_TEMP/git-push.XXXXXX.log")
-        git push ${{ inputs.remote-name }} ${{ inputs.remote-ref }} ${{ inputs.push-options }} > "$push_log" 2>&1
-        git_push_exit_code=$?
-        if [[ "${{ inputs.debug }}" == "true" ]]; then
-          cat "$push_log"
-        fi
-        if [[ $git_push_exit_code -ne 0 ]]; then
-          echo "::error::Git push failed! Set input 'debug' to 'true' to view output."
-          exit 1
-        fi
-        echo "::notice::Git push succeeded!"
-        echo "push-log=$push_log" >> "$GITHUB_OUTPUT"
-      shell: bash
+      uses: drkibitz/github/actions/git-push@main
+      with:
+        debug: ${{ inputs.debug }}
+        push-options: ${{ inputs.push-options }}
+        remote-ref: ${{ inputs.remote-ref }}
+        remote-url: ${{ inputs.remote-url }}
 
-    - name: Cleanup SSH
+    - name: Teardown SSH
+      uses: drkibitz/github/actions/teardown-ssh@main
       if: always()
-      env:
-        SSH_AUTH_SOCK: ${{ steps.ssh.outputs.ssh-auth-sock }}
-      run: |
-        ssh-add -D
-        rm -rf ~/.ssh/
-      shell: bash

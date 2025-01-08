@@ -8,11 +8,6 @@ on:
         type: string
         description: "The Git branch to deploy and push to the remote repository."
         required: true
-      push-options:
-        type: string
-        description: "Additional options for the `git push` command (e.g. `--force`)."
-        required: false
-        default: "--force"
     secrets:
       debug:
         description: "Set to `true` to enable debug logging."
@@ -25,9 +20,9 @@ on:
         required: true
 
     outputs:
-      deploy-id:
-        description: "The deploy ID generated during the process."
-        value: ${{ jobs.deploy-to-cpanel-host.outputs.deploy-id }}
+      deployment-id:
+        description: "The deployment ID generated after a git push with new changes."
+        value: ${{ jobs.deploy-to-cpanel-host.outputs.deployment-id }}
 
 jobs:
   deploy-to-cpanel-host:
@@ -38,7 +33,7 @@ jobs:
       deploy-id: ${{ steps.get-deploy-id.outputs.deploy-id }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -49,17 +44,17 @@ jobs:
         uses: drkibitz/github/actions/git-push-over-ssh@main
         with:
           debug: ${{ secrets.debug }}
-          push-options: ${{ inputs.push-options }}
+          push-options: --force
           remote-url: ${{ secrets.remote-url }}
           ssh-private-key: ${{ secrets.ssh-private-key }}
 
-      - name: Get deploy ID
-        id: get-deploy-id
+      - name: Get deployment ID
+        id: get-deployment-id
         run: |
-          deploy_id=$(grep -Eo "deploy_id: [0-9]+" "${{ steps.git-push.outputs.push-log }}" | cut -d ' ' -f2)
-          if [ -z "${deploy_id}" ]; then
-            echo "::error::FAIL: No deploy_id found in Git push log!"
+          deployment_id=$(grep -Eo "deploy_id: [0-9]+" "${{ steps.git-push.outputs.push-log }}" | cut -d ' ' -f2)
+          if [ -z "${deployment_id}" ]; then
+            echo "::error::FAIL: No 'deploy_id' found in Git push log!"
             exit 1
           fi
-          echo -e "::notice::SUCCESS! Deploy ID: $deploy_id"
-          echo "deploy-id=$deploy_id" >> "$GITHUB_OUTPUT"
+          echo -e "::notice::SUCCESS! Deployment ID: $deployment_id"
+          echo "deployment-id=$deployment_id" >> "$GITHUB_OUTPUT"
