@@ -55,7 +55,7 @@ jobs:
             cd ${{ steps.parse-url.outputs.pathname }}
             rsync -avu --delete --exclude='.git' ${{ secrets.remote-deployment-path }}/ .
             git add -- .
-            git diff-index --quiet HEAD || git commit -m "Sync runtime changes from deployment."
+            git diff-index --quiet HEAD || git commit -m "Sync runtime changes from deployment. [skip ci]"
           EOF
           git pull ${{ secrets.remote-url }} ${{ inputs.branch }} --rebase
           git push origin ${{ inputs.branch }}
