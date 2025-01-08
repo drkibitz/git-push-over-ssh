@@ -1,0 +1,117 @@
+name: 'Git Push Over SSH'
+description: 'A composite action to securely push changes to a remote Git repository over SSH.'
+author: 'Dr. Kibitz (@drkibitz)'
+
+inputs:
+  debug:
+    description: 'Set to `true` to enable debug logging.'
+    required: false
+    default: 'false'
+  push-options:
+    description: 'Additional options for the `git push` command (e.g. `--force`).'
+    required: false
+    default: ''
+  ref:
+    description: 'The Git branch, tag, or commit SHA to checkout locally before pushing.'
+    required: true
+  remote-name:
+    description: 'The name of the remote repository (e.g. `origin`, `upstream`).'
+    required: false
+    default: 'upstream'
+  remote-ref:
+    description: 'The branch, tag, or commit SHA to push to the remote repository (default: `HEAD`).'
+    required: false
+    default: 'HEAD'
+  remote-url:
+    description: 'The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`).'
+    required: true
+  ssh-private-key:
+    description: 'The SSH private key used to authenticate with the remote repository.'
+    required: true
+
+outputs:
+  push-log:
+    description: 'The path to the log file containing the output of the `git push` command.'
+    value: ${{ steps.push.outputs.push-log }}
+
+runs:
+  using: composite
+  steps:
+  - name: 'Checkout Repository'
+    uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+      ref: ${{ inputs.ref }}
+
+  - name: 'Parse Remote Git SSH URL'
+    id: parse-url
+    run: |
+      from urllib.parse import urlparse
+      import os
+      import sys
+      try:
+          is_debug = "${{ inputs.debug }}" == "true"
+          url = urlparse("${{ inputs.remote-url }}")
+          outputs = {
+              'username': url.username,
+              'hostname': url.hostname,
+              'port': url.port or 22,
+              'pathname': f"/{url.path.lstrip('/')}" if url.path else None,
+          }
+          for key, value in outputs.items():
+              if not value:
+                  raise ValueError(f"Invalid Git+SSH URL: Missing required component '{key}'.")
+              if not is_debug:
+                  print(f"::add-mask::{value}")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as outputs_file:
+              outputs_file.writelines(f"{key}={value}\n" for key, value in outputs.items())
+      except Exception as e:
+          print(f"::error::{str(e)}", file=sys.stderr)
+          sys.exit(1)
+    shell: python
+
+  - name: 'Configure SSH'
+    id: ssh
+    run: |
+      mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
+      eval $(ssh-agent -s)
+      ssh-keyscan -p ${{ steps.parse-url.outputs.port }} ${{ steps.parse-url.outputs.hostname }} >> ~/.ssh/known_hosts 2>/dev/null
+      echo "${{ inputs.ssh-private-key }}" | ssh-add -
+      ssh -T -p ${{ steps.parse-url.outputs.port }} -o BatchMode=yes ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }}
+      echo "ssh-auth-sock=$SSH_AUTH_SOCK" >> "$GITHUB_OUTPUT"
+    shell: bash
+
+  - name: 'Configure Git Remote'
+    run: |
+      git remote add ${{ inputs.remote-name }} ${{ inputs.remote-url }}
+      echo "::notice::Git remote '${{ inputs.remote-name }}' URL: $(git config --get remote.${{ inputs.remote-name }}.url)"
+    shell: bash
+
+  - name: 'Execute Git Push'
+    id: push
+    env:
+      SSH_AUTH_SOCK: ${{ steps.ssh.outputs.ssh-auth-sock }}
+    run: |
+      set +e
+      push_log=$(mktemp "$RUNNER_TEMP/git-push.XXXXXX.log")
+      git push ${{ inputs.remote-name }} ${{ inputs.remote-ref }} ${{ inputs.push-options }} > "$push_log" 2>&1
+      git_push_exit_code=$?
+      if [[ "${{ inputs.debug }}" == "true" ]]; then
+        cat "$push_log"
+      fi
+      if [[ $git_push_exit_code -ne 0 ]]; then
+        echo "::error::Git push failed! Set input 'debug' to 'true' to view output."
+        exit 1
+      fi
+      echo "::notice::Git push succeeded!"
+      echo "push-log=$push_log" >> "$GITHUB_OUTPUT"
+    shell: bash
+
+  - name: 'Cleanup SSH Agent and Configuration'
+    if: always()
+    env:
+      SSH_AUTH_SOCK: ${{ steps.ssh.outputs.ssh-auth-sock }}
+    run: |
+      ssh-add -D
+      rm -rf ~/.ssh/
+    shell: bash
