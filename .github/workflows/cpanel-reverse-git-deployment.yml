@@ -1,0 +1,66 @@
+name: cPanel Reverse Git Deployment
+description: "Reusable workflow to sync runtime changes from a cPanel-hosted site to the source Git repository and push them upstream."
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        type: string
+        description: "The Git branch in the source repository to synchronize with."
+        required: true
+    secrets:
+      debug:
+        description: "Set to `true` to enable debug logging."
+        required: false
+      remote-deployment-path:
+        description: "The absolute path on the cPanel host where the application is deployed."
+        required: true
+      remote-url:
+        description: "The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
+        required: true
+      ssh-private-key:
+        description: "The SSH private key used to authenticate with the remote repository."
+        required: true
+
+jobs:
+  pull-cpanel-host-deployment:
+    name: Synchronize runtime changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch }}
+
+      - name: Parse Git+SSH URL
+        id: parse-url
+        uses: drkibitz/github/actions/parse-git-ssh-url@main
+        with:
+          url: ${{ secrets.remote-url }}
+
+      - name: Setup SSH
+        uses: drkibitz/github/actions/setup-ssh@main
+        with:
+          port: ${{ steps.parse-url.outputs.port }}
+          username: ${{ steps.parse-url.outputs.username }}
+          hostname: ${{ steps.parse-url.outputs.hostname }}
+          ssh-private-key: ${{ secrets.ssh-private-key }}
+
+      - name: Synchronize runtime deployment changes
+        run: |
+          set -e
+          ssh ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} <<EOF
+            cd ${{ steps.parse-url.outputs.pathname }}
+            rsync -avu --delete --exclude='.git' ${{ secrets.remote-deployment-path }}/ .
+            git add -- .
+            git diff-index --quiet HEAD || git commit -m "Sync runtime changes from deployment."
+          EOF
+          git pull ${{ secrets.remote-url }} ${{ inputs.branch }} --rebase
+          git push origin ${{ inputs.branch }}
+        shell: bash
+
+      - name: Teardown SSH
+        uses: drkibitz/github/actions/teardown-ssh@main
+        if: always()
