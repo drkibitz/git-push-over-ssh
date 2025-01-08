@@ -12,8 +12,8 @@ A composite action to push to a remote Git repository over SSH.
 
 ---
 
-## [Workflows](workflows/)
+## [Workflows](.github/workflows/)
 
-### [cpanel-git-deployment](workflows/cpanel-git-deployment/workflow.yml)
+### [cpanel-git-deployment](.github/workflows/cpanel-git-deployment.yml)
 
 A reusable workflow for deploying to a [cPanel](https://cpanel.net/) hosted site using Git. See the [Guide to Git™ Deployment](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/) for more details.
