@@ -1,0 +1,56 @@
+name: Parse Git+SSH URL
+description: "A composite action that parses a Git+SSH URL into its required components."
+author: Dr. Kibitz (@drkibitz)
+
+inputs:
+  debug:
+    description: "Set to `true` to enable debug logging."
+    required: false
+    default: "false"
+  url:
+    description: "The Git+SSH URL to parse (e.g., `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
+    required: true
+
+outputs:
+  username:
+    description: "The `username` component of the parsed URL."
+    value: ${{ steps.parse-url.outputs.username }}
+  hostname:
+    description: "The `hostname` component of the parsed URL."
+    value: ${{ steps.parse-url.outputs.hostname }}
+  port:
+    description: "The `port` component of the parsed URL (default: `22` if not specified)."
+    value: ${{ steps.parse-url.outputs.port }}
+  pathname:
+    description: "The `pathname` (repository path) component of the parsed URL."
+    value: ${{ steps.parse-url.outputs.pathname }}
+
+runs:
+  using: composite
+  steps:
+    - name: Parse Git+SSH URL
+      id: parse-url
+      run: |
+        from urllib.parse import urlparse
+        import os
+        import sys
+        try:
+            is_debug = "${{ inputs.debug }}" == "true"
+            url = urlparse("${{ inputs.url }}")
+            outputs = {
+                'username': url.username,
+                'hostname': url.hostname,
+                'port': url.port or 22,
+                'pathname': f"/{url.path.lstrip('/')}" if url.path else None,
+            }
+            for key, value in outputs.items():
+                if not value:
+                    raise ValueError(f"Invalid Git+SSH URL: Missing required component '{key}'.")
+                if not is_debug:
+                    print(f"::add-mask::{value}")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as outputs_file:
+                outputs_file.writelines(f"{key}={value}\n" for key, value in outputs.items())
+        except Exception as e:
+            print(f"::error::{str(e)}", file=sys.stderr)
+            sys.exit(1)
+      shell: python

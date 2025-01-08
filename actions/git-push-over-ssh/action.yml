@@ -36,30 +36,10 @@ runs:
   steps:
     - name: Parse remote Git SSH URL
       id: parse-url
-      run: |
-        from urllib.parse import urlparse
-        import os
-        import sys
-        try:
-            is_debug = "${{ inputs.debug }}" == "true"
-            url = urlparse("${{ inputs.remote-url }}")
-            outputs = {
-                'username': url.username,
-                'hostname': url.hostname,
-                'port': url.port or 22,
-                'pathname': f"/{url.path.lstrip('/')}" if url.path else None,
-            }
-            for key, value in outputs.items():
-                if not value:
-                    raise ValueError(f"Invalid Git+SSH URL: Missing required component '{key}'.")
-                if not is_debug:
-                    print(f"::add-mask::{value}")
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as outputs_file:
-                outputs_file.writelines(f"{key}={value}\n" for key, value in outputs.items())
-        except Exception as e:
-            print(f"::error::{str(e)}", file=sys.stderr)
-            sys.exit(1)
-      shell: python
+      uses: drkibitz/github/actions/parse-git-ssh-url@main
+      with:
+        debug: ${{ inputs.debug }}
+        url: ${{ inputs.remote-url }}
 
     - name: Configure SSH
       id: ssh

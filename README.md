@@ -6,9 +6,13 @@ Shared GitHub [composite actions](https://docs.github.com/en/actions/sharing-aut
 
 ## [Actions](actions/)
 
+### [parse-git-ssh-url](actions/parse-git-ssh-url/action.yml)
+
+A composite action that parses a Git+SSH URL into its required components.
+
 ### [git-push-over-ssh](actions/git-push-over-ssh/action.yml)
 
-A composite action to push to a remote Git repository over SSH.
+A composite action to securely push changes to a remote Git repository over SSH.
 
 ---
 
