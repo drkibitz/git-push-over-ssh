@@ -33,16 +33,23 @@ jobs:
   cpanel-git-deployment:
     runs-on: ubuntu-latest
     name: 'Deploy to cPanel Host'
+
     outputs:
       deploy-id: ${{ steps.get-deploy-id.outputs.deploy-id }}
+
     steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.branch }}
+
     - name: 'Git Push Over SSH'
       id: git-push
       uses: drkibitz/github/actions/git-push-over-ssh@main
       with:
         debug: ${{ secrets.debug }}
         push-options: ${{ inputs.push-options }}
-        ref: ${{ inputs.branch }}
         remote-url: ${{ secrets.remote-url }}
         ssh-private-key: ${{ secrets.ssh-private-key }}
 

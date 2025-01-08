@@ -11,9 +11,6 @@ inputs:
     description: 'Additional options for the `git push` command (e.g. `--force`).'
     required: false
     default: ''
-  ref:
-    description: 'The Git branch, tag, or commit SHA to checkout locally before pushing.'
-    required: true
   remote-name:
     description: 'The name of the remote repository (e.g. `origin`, `upstream`).'
     required: false
@@ -37,12 +34,6 @@ outputs:
 runs:
   using: composite
   steps:
-  - name: 'Checkout Repository'
-    uses: actions/checkout@v4
-    with:
-      fetch-depth: 0
-      ref: ${{ inputs.ref }}
-
   - name: 'Parse Remote Git SSH URL'
     id: parse-url
     run: |
