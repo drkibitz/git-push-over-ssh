@@ -15,6 +15,9 @@ on:
       remote-url:
         description: "The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
         required: true
+      rsync-dest-dir:
+        description: "Reserving this for future use, unused for now."
+        required: true
       ssh-private-key:
         description: "The SSH private key used to authenticate with the remote repository."
         required: true
@@ -30,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      deployment-id: ${{ steps.get-deployment-id.outputs.deployment-id }}
+      deployment-id: ${{ steps.process-deployment.outputs.deployment-id }}
 
     steps:
       - name: Checkout source repository
@@ -39,22 +42,48 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.branch }}
 
-      - name: Git push over SSH
-        id: git-push
-        uses: drkibitz/github/actions/git-push-over-ssh@main
+      - name: Parse Git+SSH URL
+        id: parse-url
+        uses: drkibitz/github/actions/parse-git-ssh-url@main
         with:
-          debug: ${{ inputs.debug }}
-          push-options: --force
-          remote-url: ${{ secrets.remote-url }}
+          url: ${{ secrets.remote-url }}
+
+      - name: Setup SSH agent
+        uses: drkibitz/github/actions/setup-ssh-agent@main
+        with:
+          port: ${{ steps.parse-url.outputs.port }}
+          username: ${{ steps.parse-url.outputs.username }}
+          hostname: ${{ steps.parse-url.outputs.hostname }}
           ssh-private-key: ${{ secrets.ssh-private-key }}
 
-      - name: Get deployment ID
-        id: get-deployment-id
+      - name: Git push
+        id: git-push
+        uses: drkibitz/github/actions/git-push@main
+        with:
+          debug: ${{ inputs.debug }}
+          # This is a deployment repo, we are ok with rewriting history on it.
+          push-options: --force
+          remote-url: ${{ secrets.remote-url }}
+
+      - name: Process deployment
+        id: process-deployment
         run: |
           deployment_id=$(grep -Eo "deploy_id: [0-9]+" "${{ steps.git-push.outputs.push-log }}" | cut -d ' ' -f2)
           if [ -z "${deployment_id}" ]; then
-            echo "::notice::No 'deploy_id' found in Git push log, which could just mean everything was up to date."
+            echo "::notice::No 'deploy_id' found in Git push log, which just means that a deployment did not happen."
           else
-            echo "::notice::SUCCESS! Deployment ID: $deployment_id"
+            echo "::notice::Found remote deployment ID: $deployment_id)"
             echo "deployment-id=$deployment_id" >> "$GITHUB_OUTPUT"
+            remote_log_path=$(grep -Eo "log_path: [^ ]+" "${{ steps.git-push.outputs.push-log }}" | awk '{print $2}')
+            if [ -z "${remote_log_path}" ]; then
+              echo "::error::No 'log_path' found in Git push log with a deployment, this is unexpected!"
+              exit 1
+            fi
+            echo "::notice::Found remote deployment log:"
+            ssh -o BatchMode=yes -p ${{ steps.parse-url.outputs.port }} ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} \
+              "cat $remote_log_path | sed 's/^/[remote] /'"
           fi
+
+      - name: Teardown SSH agent
+        uses: drkibitz/github/actions/teardown-ssh-agent@main
+        if: always()

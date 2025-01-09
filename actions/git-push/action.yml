@@ -31,7 +31,7 @@ runs:
       run: |
         push_log="$(mktemp "$RUNNER_TEMP/git-push.XXXXXX.log")"
         set +e
-        git push ${{ inputs.remote-url }} ${{ inputs.remote-ref }} ${{ inputs.push-options }} >> "$push_log" 2>&1
+        git push ${{ inputs.push-options }} ${{ inputs.remote-url }} ${{ inputs.remote-ref }} >> "$push_log" 2>&1
         git_push_exit_code=$?
         set -e
         [[ "${{ inputs.debug }}" == "true" ]] && echo "::notice::Debug enabled, push output:" && cat "$push_log"
