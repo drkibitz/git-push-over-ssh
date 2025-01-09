@@ -6,6 +6,10 @@ on:
         type: string
         description: "The Git branch in the source repository to synchronize with."
         required: true
+      rsync-filter-file:
+        type: string
+        description: "File defining rsync filter rules (See: https://download.samba.org/pub/rsync/rsync.html#FILTER_RULES)."
+        required: false
       rsync-options:
         type: string
         description: Base rsync options. Defaults to `-avu --delete --exclude='.git/'`.
@@ -67,12 +71,17 @@ jobs:
 
       - name: Run rsync remotely
         run: |
+          rsync_filters="${{ secrets.rsync-filters }}"
+          rsync_filter_file="${{ secrets.rsync-filter-file }}"
+          if [ -f "$rsync_filter_file" ]; then
+            rsync_filters+=$'\n'$(cat "$rsync_filter_file")
+          fi
           ssh -o BatchMode=yes -p ${{ steps.parse-url.outputs.port }} ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} <<EOF
             set -e
             sync_dest="${{ steps.parse-url.outputs.pathname }}"
             eval sync_src="${{ secrets.rsync-source-dir }}"
             cd "\${sync_dest/#\/~/~}"
-            echo "${{ secrets.rsync-filters }}" | rsync ${{ inputs.rsync-options }} --filter='merge -' "\$sync_src/" .
+            echo "$rsync_filters" | rsync ${{ inputs.rsync-options }} --filter='merge -' "\$sync_src/" .
             git add --all
             git diff --cached --quiet || git commit -m "Sync runtime changes from deployment. [skip ci]"
           EOF
