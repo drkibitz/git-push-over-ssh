@@ -51,7 +51,7 @@ jobs:
       - name: Synchronize runtime deployment changes
         run: |
           set -e
-          ssh ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} <<EOF
+          ssh -p ${{ inputs.port }} ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} <<EOF
             cd ${{ steps.parse-url.outputs.pathname }}
             rsync -avu --delete --exclude='.git' ${{ secrets.remote-deployment-path }}/ .
             git add -- .
