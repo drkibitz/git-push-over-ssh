@@ -10,7 +10,6 @@ inputs:
   push-options:
     description: "Additional options for the `git push` command (e.g., `--force` or `--tags`). Leave empty for default behavior."
     required: false
-    default: ""
   remote-ref:
     description: "The branch, tag, or commit SHA to push to the remote repository. Default: `HEAD`."
     required: false
