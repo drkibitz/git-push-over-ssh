@@ -52,7 +52,7 @@ runs:
                 return {
                     'username': parsed.username or '${{ inputs.default-username }}',
                     'hostname': parsed.hostname,
-                    'port': int(parsed.port) if parsed.port else ${{ inputs.default-port }}',
+                    'port': int(parsed.port) if parsed.port else ${{ inputs.default-port }},
                     'pathname': f"/{parsed.path.lstrip('/')}",
                 }
             scp = re.match(r"^(?P<username>[^@]+)@(?P<hostname>[^:/]+)(?::(?P<pathname>.*))?$", url)
