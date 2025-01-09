@@ -1,6 +1,4 @@
 name: cPanel Reverse Git Deployment
-description: "Reusable workflow to sync runtime changes from a cPanel-hosted site to the source Git repository and push them upstream."
-
 on:
   workflow_call:
     inputs:
@@ -8,15 +6,32 @@ on:
         type: string
         description: "The Git branch in the source repository to synchronize with."
         required: true
+      rsync-options:
+        type: string
+        description: Base rsync options. Defaults to `-avu --delete --exclude='.git/'`.
+        required: false
+        default: "-avu --delete --exclude='.git/'"
     secrets:
       debug:
         description: "Set to `true` to enable debug logging."
         required: false
-      remote-deployment-path:
-        description: "The absolute path on the cPanel host where the application is deployed."
-        required: true
       remote-url:
         description: "The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
+        required: true
+      rsync-filters:
+        description: |
+          Multiline rsync filter rules (See: https://download.samba.org/pub/rsync/rsync.html#FILTER_RULES).
+          Example:
+          ```
+          + /public-dir-to-sync
+          + /private-dir-to-sync
+          - /*
+          ```
+          It is good practice to keep the rul `- /*` at the end of your list.
+          There is also an option for `--exclude='.git/'` set by default in the `inputs.rsync-options`.
+        required: false
+      rsync-source-dir:
+        description: "Absolute path of the source directory on the remote host."
         required: true
       ssh-private-key:
         description: "The SSH private key used to authenticate with the remote repository."
@@ -48,15 +63,20 @@ jobs:
           hostname: ${{ steps.parse-url.outputs.hostname }}
           ssh-private-key: ${{ secrets.ssh-private-key }}
 
-      - name: Synchronize runtime deployment changes
+      - name: Run rsync remotely
         run: |
-          set -e
-          ssh -p ${{ inputs.port }} ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} <<EOF
-            cd ${{ steps.parse-url.outputs.pathname }}
-            rsync -avu --delete --exclude='.git' ${{ secrets.remote-deployment-path }}/ .
-            git add -- .
-            git diff-index --quiet HEAD || git commit -m "Sync runtime changes from deployment. [skip ci]"
+          ssh -o BatchMode=yes -p ${{ steps.parse-url.outputs.port }} ${{ steps.parse-url.outputs.username }}@${{ steps.parse-url.outputs.hostname }} <<EOF
+            set -e
+            sync_dest="${{ steps.parse-url.outputs.pathname }}"
+            eval sync_src="${{ secrets.rsync-source-dir }}"
+            cd "\${sync_dest/#\/~/~}"
+            echo "${{ secrets.rsync-filters }}" | rsync ${{ inputs.rsync-options }} --filter='merge -' "\$sync_src/" .
+            git add --all
+            git diff --cached --quiet || git commit -m "Sync runtime changes from deployment. [skip ci]"
           EOF
+
+      - name: Sync changes back to local repository
+        run: |
           git pull ${{ secrets.remote-url }} ${{ inputs.branch }} --rebase
           git push origin ${{ inputs.branch }}
         shell: bash

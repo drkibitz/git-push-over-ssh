@@ -26,6 +26,6 @@ runs:
         eval $(ssh-agent -s)
         ssh-keyscan -p ${{ inputs.port }} ${{ inputs.hostname }} >> ~/.ssh/known_hosts 2>/dev/null
         echo "${{ inputs.ssh-private-key }}" | ssh-add -
-        ssh -T -p ${{ inputs.port }} -o BatchMode=yes ${{ inputs.username }}@${{ inputs.hostname }}
+        ssh -T -o BatchMode=yes -p ${{ inputs.port }} ${{ inputs.username }}@${{ inputs.hostname }}
         echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
       shell: bash

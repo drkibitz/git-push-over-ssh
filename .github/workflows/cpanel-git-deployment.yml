@@ -1,6 +1,4 @@
 name: cPanel Git Deployment
-description: "A reusable workflow for deploying to a [cPanel](https://cpanel.net/) hosted site using Git. See the [Guide to Git™ Deployment](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/) for more details."
-
 on:
   workflow_call:
     inputs:
@@ -30,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      deploy-id: ${{ steps.get-deploy-id.outputs.deploy-id }}
+      deployment-id: ${{ steps.get-deployment-id.outputs.deployment-id }}
 
     steps:
       - name: Checkout source repository
