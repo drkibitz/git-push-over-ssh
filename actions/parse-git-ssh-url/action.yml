@@ -10,6 +10,14 @@ inputs:
   url:
     description: "The Git+SSH URL to parse (e.g., `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
     required: true
+  default-port:
+    description: "The default SSH port when not specified in the URL (default: `22` if not specified)."
+    required: false
+    default: "22"
+  default-username:
+    description: "The default SSH username when not specified in the URL (default: `git` if not specified)."
+    required: false
+    default: "git"
 
 outputs:
   username:
@@ -19,7 +27,7 @@ outputs:
     description: "The `hostname` component of the parsed URL."
     value: ${{ steps.parse-url.outputs.hostname }}
   port:
-    description: "The `port` component of the parsed URL (default: `22` if not specified)."
+    description: "The `port` component of the parsed URL or value of inputs.default-port."
     value: ${{ steps.parse-url.outputs.port }}
   pathname:
     description: "The `pathname` (repository path) component of the parsed URL."
@@ -32,25 +40,43 @@ runs:
       id: parse-url
       run: |
         from urllib.parse import urlparse
+        import re
         import os
         import sys
+
+        def parse_git_ssh_url(url):
+            parsed = urlparse(url)
+            if parsed.hostname:
+                if parsed.scheme != 'ssh' or not parsed.path:
+                    raise ValueError(f"Invalid Git+SSH URL: '{url}'")
+                return {
+                    'username': parsed.username or '${{ inputs.default-username }}',
+                    'hostname': parsed.hostname,
+                    'port': int(parsed.port) if parsed.port else ${{ inputs.default-port }}',
+                    'pathname': f"/{parsed.path.lstrip('/')}",
+                }
+            scp = re.match(r"^(?P<username>[^@]+)@(?P<hostname>[^:/]+)(?::(?P<pathname>.*))?$", url)
+            if scp:
+                pathname = scp.group('pathname') or "/~/"
+                pathname = f"/~/{pathname}" if not (pathname.startswith('/') or pathname.startswith('~')) else f"/{pathname.lstrip('/')}"
+                return {
+                    'username': scp.group('username'),
+                    'hostname': scp.group('hostname'),
+                    'port': ${{ inputs.default-port }},
+                    'pathname': pathname,
+                }
+            raise ValueError(f"Invalid Git+SSH URL: '{url}'")
+
         try:
-            is_debug = "${{ inputs.debug }}" == "true"
-            url = urlparse("${{ inputs.url }}")
-            outputs = {
-                'username': url.username,
-                'hostname': url.hostname,
-                'port': url.port or 22,
-                'pathname': f"/{url.path.lstrip('/')}" if url.path else None,
-            }
-            for key, value in outputs.items():
-                if not value:
-                    raise ValueError(f"Invalid Git+SSH URL: Missing required component '{key}'.")
-                if not is_debug:
+            outputs = parse_git_ssh_url("${{ inputs.url }}")
+            debug = '${{ inputs.debug }}' == 'true'
+            if not debug:
+                for value in outputs.values():
                     print(f"::add-mask::{value}")
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as outputs_file:
-                outputs_file.writelines(f"{key}={value}\n" for key, value in outputs.items())
+            with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                f.writelines(f"{key}={value}\n" for key, value in outputs.items())
         except Exception as e:
-            print(f"::error::{str(e)}", file=sys.stderr)
-            sys.exit(1)
+            print(f"::error::{e}", file=sys.stderr)
+            exit(1)
+
       shell: python
