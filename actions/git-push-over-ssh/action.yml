@@ -33,7 +33,6 @@ runs:
       id: parse-url
       uses: drkibitz/github/actions/parse-git-ssh-url@main
       with:
-        debug: ${{ inputs.debug }}
         url: ${{ inputs.remote-url }}
 
     - name: Setup SSH agent

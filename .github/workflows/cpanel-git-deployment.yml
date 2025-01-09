@@ -6,10 +6,12 @@ on:
         type: string
         description: "The Git branch to deploy and push to the remote repository."
         required: true
-    secrets:
       debug:
-        description: "Set to `true` to enable debug logging."
+        type: string
+        description: "Set to `true` to enable debug logging (default: `false`)."
         required: false
+        default: "false"
+    secrets:
       remote-url:
         description: "The Git+SSH URL of the remote repository (e.g. `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
         required: true
@@ -41,7 +43,7 @@ jobs:
         id: git-push
         uses: drkibitz/github/actions/git-push-over-ssh@main
         with:
-          debug: ${{ secrets.debug }}
+          debug: ${{ inputs.debug }}
           push-options: --force
           remote-url: ${{ secrets.remote-url }}
           ssh-private-key: ${{ secrets.ssh-private-key }}
@@ -51,8 +53,8 @@ jobs:
         run: |
           deployment_id=$(grep -Eo "deploy_id: [0-9]+" "${{ steps.git-push.outputs.push-log }}" | cut -d ' ' -f2)
           if [ -z "${deployment_id}" ]; then
-            echo "::error::FAIL: No 'deploy_id' found in Git push log!"
-            exit 1
+            echo "::notice::No 'deploy_id' found in Git push log, which could just mean everything was up to date."
+          else
+            echo "::notice::SUCCESS! Deployment ID: $deployment_id"
+            echo "deployment-id=$deployment_id" >> "$GITHUB_OUTPUT"
           fi
-          echo -e "::notice::SUCCESS! Deployment ID: $deployment_id"
-          echo "deployment-id=$deployment_id" >> "$GITHUB_OUTPUT"

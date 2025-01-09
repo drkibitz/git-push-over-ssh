@@ -3,10 +3,6 @@ description: "A composite action that parses a Git+SSH URL into its required com
 author: Dr. Kibitz (@drkibitz)
 
 inputs:
-  debug:
-    description: "Set to `true` to enable debug logging."
-    required: false
-    default: "false"
   url:
     description: "The Git+SSH URL to parse (e.g., `git@hostname:user/repo.git`, `ssh://user@hostname:port/repo.git`)."
     required: true
@@ -69,10 +65,8 @@ runs:
 
         try:
             outputs = parse_git_ssh_url("${{ inputs.url }}")
-            debug = '${{ inputs.debug }}' == 'true'
-            if not debug:
-                for value in outputs.values():
-                    print(f"::add-mask::{value}")
+            for value in outputs.values():
+                print(f"::add-mask::{value}")
             with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                 f.writelines(f"{key}={value}\n" for key, value in outputs.items())
         except Exception as e:
