@@ -41,6 +41,8 @@ jobs:
   pull-cpanel-host-deployment:
     name: Pull cPanel host deployment
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout source repository
@@ -78,6 +80,7 @@ jobs:
       - name: Sync changes back to local repository
         run: |
           git pull ${{ secrets.remote-url }} ${{ inputs.branch }} --rebase
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git push origin ${{ inputs.branch }}
         shell: bash
 
