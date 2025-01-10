@@ -6,6 +6,14 @@ on:
         type: string
         description: "The Git branch in the source repository to synchronize with."
         required: true
+      git-config-user-email:
+        type: string
+        description: "The email to use for any git commit operations (including rebasing) during this workflow."
+        required: true
+      git-config-user-name:
+        type: string
+        description: "The name to use for any git commit operations (including rebasing) during this workflow."
+        required: true
       rsync-filter-file:
         type: string
         description: "File defining rsync filter rules (See: https://download.samba.org/pub/rsync/rsync.html#FILTER_RULES)."
@@ -53,6 +61,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.branch }}
 
+      - name: Git config user
+        run: |
+          git config --local user.email "${{ inputs.git-config-user-email }}"
+          git config --local user.name "${{ inputs.git-config-user-name }}"
+
       - name: Parse Git+SSH URL
         id: parse-url
         uses: drkibitz/github/actions/parse-git-ssh-url@main
@@ -81,7 +94,7 @@ jobs:
             cd "\${sync_dest/#\/~/~}"
             echo "$rsync_filters" | rsync ${{ inputs.rsync-options }} --filter='merge -' "\$sync_src/" .
             git add --all
-            git diff --cached --quiet || git commit -m "Sync runtime changes from deployment. [skip ci]"
+            git diff --cached --quiet || git -c user.name="${{ inputs.git-config-user-name }}" -c user.email="${{ inputs.git-config-user-email }}" commit -m "Sync runtime changes from deployment. [skip ci]"
           EOF
 
       - name: Sync changes back to local repository
